@@ -1,0 +1,38 @@
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data & Models
+data/raw/*
+data/processed/*
+*.faiss
+*.pkl
+*.joblib
+
+# Logs
+logs/
+*.log
+
+# Temporary
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
