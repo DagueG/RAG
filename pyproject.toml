@@ -8,6 +8,7 @@ dependencies = [
   "faiss-cpu==1.7.4",
   "langchain",
   "langchain-community",
+  "langchain-huggingface",
   "sentence-transformers==2.2.2",
   "mistralai==1.12.4",
   "requests",
