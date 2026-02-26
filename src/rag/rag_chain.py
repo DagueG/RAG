@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Tuple, List, Dict, Any
 
-from mistralai.client import MistralClient
+from mistralai import Mistral
 from langchain_core.prompts import PromptTemplate
 
 from src.vectorization.embeddings import EventEmbeddingManager
@@ -67,8 +67,8 @@ class RAGChain:
         self.mistral_client = None
         try:
             if api_key:  # Only initialize if we have a key
-                logger.info("Attempting to initialize MistralClient...")
-                self.mistral_client = MistralClient(api_key=api_key)
+                logger.info("Attempting to initialize Mistral client...")
+                self.mistral_client = Mistral(api_key=api_key)
                 logger.info("Mistral client initialized with API key")
             else:
                 logger.warning("No API key provided - RAG will not generate responses")
@@ -217,7 +217,7 @@ Réponse:"""
         try:
             # Call Mistral to generate response
             logger.debug("Calling Mistral LLM...")
-            response = self.mistral_client.chat(
+            response = self.mistral_client.chat.complete(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt_text}],
                 temperature=0.7,

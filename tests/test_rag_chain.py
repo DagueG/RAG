@@ -76,7 +76,7 @@ def setup_faiss_index(tmp_path, sample_events):
 class TestRAGChainInitialization:
     """Test RAG Chain initialization."""
     
-    @patch('src.rag.rag_chain.MistralClient')
+    @patch('src.rag.rag_chain.Mistral')
     def test_rag_chain_initialization(self, mock_mistral, setup_faiss_index):
         """Test that RAG Chain initializes correctly."""
         mock_mistral.return_value = MagicMock()
@@ -88,7 +88,7 @@ class TestRAGChainInitialization:
         assert rag.prompt_template is not None
         logger.info("[PASS] RAG Chain initialization test")
     
-    @patch('src.rag.rag_chain.MistralClient')
+    @patch('src.rag.rag_chain.Mistral')
     def test_rag_chain_metadata_loading(self, mock_mistral, setup_faiss_index, sample_events):
         """Test that events metadata is loaded correctly."""
         mock_mistral.return_value = MagicMock()
@@ -116,7 +116,7 @@ class TestRAGChainSearch:
         builder.build_index(sample_events)
         builder.save_index(str(index_dir))
         
-        with patch('src.rag.rag_chain.MistralClient'):
+        with patch('src.rag.rag_chain.Mistral'):
             return RAGChain(index_dir=str(index_dir))
     
     def test_search_events_jazz(self, rag_chain):
@@ -173,7 +173,7 @@ class TestRAGChainFormatting:
         builder.build_index(sample_events)
         builder.save_index(str(index_dir))
         
-        with patch('src.rag.rag_chain.MistralClient'):
+        with patch('src.rag.rag_chain.Mistral'):
             rag = RAGChain(index_dir=str(index_dir))
         
         # Test formatting
@@ -194,7 +194,7 @@ class TestRAGChainFormatting:
         builder.build_index(sample_events)
         builder.save_index(str(index_dir))
         
-        with patch('src.rag.rag_chain.MistralClient'):
+        with patch('src.rag.rag_chain.Mistral'):
             rag = RAGChain(index_dir=str(index_dir))
         
         # Test empty list
@@ -217,7 +217,7 @@ class TestRAGChainIntegration:
         builder.build_index(sample_events)
         builder.save_index(str(index_dir))
         
-        with patch('src.rag.rag_chain.MistralClient'):
+        with patch('src.rag.rag_chain.Mistral'):
             return RAGChain(index_dir=str(index_dir))
     
     def test_generate_response_structure(self, rag_chain_with_mock):
@@ -226,7 +226,7 @@ class TestRAGChainIntegration:
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.choices[0].message.content = "Voici les événements recommandés pour vous..."
-        mock_client.chat.return_value = mock_response
+        mock_client.chat.complete.return_value = mock_response
         
         # Assign mocked client
         rag_chain_with_mock.mistral_client = mock_client
@@ -264,7 +264,7 @@ class TestRAGChainErrorHandling:
         
         # Should raise exception
         with pytest.raises(Exception):
-            with patch('src.rag.rag_chain.MistralClient'):
+            with patch('src.rag.rag_chain.Mistral'):
                 RAGChain(index_dir=str(missing_dir))
         
         logger.info("[PASS] Missing index handling test")
@@ -279,7 +279,7 @@ class TestRAGChainErrorHandling:
         builder.build_index(sample_events)
         builder.save_index(str(index_dir))
         
-        with patch('src.rag.rag_chain.MistralClient'):
+        with patch('src.rag.rag_chain.Mistral'):
             return RAGChain(index_dir=str(index_dir))
     
     def test_search_with_empty_query(self, rag_chain):
