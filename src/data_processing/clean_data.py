@@ -49,6 +49,7 @@ class EventDataCleaner:
     def clean_event(self, event: Dict) -> Optional[Dict]:
         """
         Nettoyer un seul événement.
+        Supporte les formats OpenDataSoft et Open Agenda.
         
         Args:
             event: Événement brut
@@ -57,19 +58,39 @@ class EventDataCleaner:
             Événement nettoyé ou None si invalid
         """
         try:
+            # Adapter les champs selon le format (OpenDataSoft vs old Open Agenda)
+            title = event.get("title_fr") or event.get("title")
+            description = event.get("description_fr") or event.get("longdescription_fr") or event.get("description")
+            
             # Vérifier les champs obligatoires
-            if not event.get("title"):
+            if not title or not description:
                 return None
+            
+            # Extraire la date selon le format
+            date_start = None
+            date_end = None
+            if event.get("firstdate_begin"):  # Format OpenDataSoft
+                date_start = self._extract_date(event.get("firstdate_begin"))
+            elif event.get("date"):  # Format Open Agenda
+                date_start = self._extract_date(event.get("date", {}).get("start"))
+                date_end = self._extract_date(event.get("date", {}).get("end"))
+            
+            # Extraire la localisation selon le format
+            location = None
+            if event.get("location_address"):  # Format OpenDataSoft
+                location = event.get("location_address", "Unknown location")
+            else:  # Format Open Agenda
+                location = self._extract_location(event)
             
             # Créer l'événement nettoyé
             cleaned = {
-                "id": event.get("uid", ""),
-                "title": str(event.get("title", "")).strip(),
-                "description": str(event.get("description", "")).strip(),
-                "date_start": self._extract_date(event.get("date", {}).get("start")) if event.get("date") else None,
-                "date_end": self._extract_date(event.get("date", {}).get("end")) if event.get("date") else None,
-                "location": self._extract_location(event),
-                "image_url": event.get("image", {}).get("url") if event.get("image") else None,
+                "id": event.get("recordid") or event.get("uid", ""),
+                "title": str(title).strip(),
+                "description": str(description).strip(),
+                "date_start": date_start,
+                "date_end": date_end,
+                "location": location,
+                "image_url": event.get("image") if isinstance(event.get("image"), str) else event.get("image", {}).get("url") if event.get("image") else None,
                 "url": event.get("url", ""),
                 "source": "openagenda",
             }

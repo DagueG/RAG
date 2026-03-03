@@ -5,10 +5,14 @@ Module pour construire et gérer l'index Faiss.
 import json
 import logging
 import pickle
+import sys
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import numpy as np
 import faiss
+
+# Ajouter le répertoire parent au chemin Python
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.data_processing.clean_data import EventDataCleaner
 from src.vectorization.embeddings import EventEmbeddingManager
@@ -189,3 +193,26 @@ def build_full_index(processed_data_path: Path, output_dir: Path) -> None:
     # Sauvegarder
     builder.save_index(output_dir)
     logger.info(f"Index successfully created with {index.ntotal} vectors")
+
+if __name__ == "__main__":
+    """Script principal pour construire l'index Faiss."""
+    import sys
+    
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    # Déterminer le chemin des données nettoyées
+    base_dir = Path(__file__).parent.parent.parent
+    processed_data = base_dir / "data" / "processed" / "toulouse_events.json"
+    output_dir = base_dir / "data" / "faiss_index"
+    
+    logger.info(f"Building index from {processed_data}")
+    logger.info(f"Output directory: {output_dir}")
+    
+    if not processed_data.exists():
+        logger.error(f"File not found: {processed_data}")
+        logger.info("Please run: python src/data_processing/clean_data.py")
+        sys.exit(1)
+    
+    build_full_index(processed_data, output_dir)
+    logger.info("✅ Index build complete!")

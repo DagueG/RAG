@@ -1,12 +1,13 @@
 """
-Script pour récupérer les événements culturels depuis l'API Open Agenda.
+Script pour récupérer les événements culturels depuis l'API OpenDataSoft.
 Focus sur la ville de Toulouse.
+Utilise les données publiques d'OpenAgenda exposées par OpenDataSoft.
 """
 
 import requests
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -14,9 +15,8 @@ from typing import List, Dict, Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration de l'API Open Agenda
-OPENAGENDA_API_BASE_URL = "https://api.openagenda.com/v2"
-OPENAGENDA_API_KEY = "123123"  # Clé publique par défaut pour les tests
+# Configuration de l'API OpenDataSoft (gratuit, pas de clé requise)
+OPENDATASOFT_API_BASE_URL = "https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/evenements-publics-openagenda/records"
 
 # Configuration de Toulouse
 TOULOUSE_LOCATION = {
@@ -26,72 +26,67 @@ TOULOUSE_LOCATION = {
     "longitude": 1.4442,
 }
 
-# Rayon de recherche en km (pour capturer les événements à Toulouse)
-SEARCH_RADIUS_KM = 20
-
 # Plages de dates
 def get_date_range():
-    """Retourne les dates pour les 12 derniers mois + événements à venir."""
-    end_date = datetime.now() + timedelta(days=365)
-    start_date = datetime.now() - timedelta(days=365)
+    """Retourne les dates pour les événements récents (actuels et futurs, < 1 an)."""
+    # Utiliser timezone aware pour comparaison avec les dates de l'API
+    start_date = datetime.now(timezone.utc)  # Événements actuels et futurs seulement
+    end_date = datetime.now(timezone.utc) + timedelta(days=365)  # Jusqu'à 1 an dans le futur
     return start_date, end_date
 
 
 class OpenAgendaEventFetcher:
-    """Classe pour récupérer les événements depuis l'API Open Agenda."""
+    """Classe pour récupérer les événements depuis l'API OpenDataSoft."""
 
-    def __init__(self, api_key: str = OPENAGENDA_API_KEY):
-        """
-        Initialiser le fetcher.
-        
-        Args:
-            api_key: Clé API Open Agenda
-        """
-        self.api_key = api_key
-        self.base_url = OPENAGENDA_API_BASE_URL
+    def __init__(self):
+        """Initialiser le fetcher."""
+        self.base_url = OPENDATASOFT_API_BASE_URL
         self.session = requests.Session()
 
     def fetch_events(
         self,
         city: str = "Toulouse",
-        limit: int = 1000,
+        limit: int = 100,
         offset: int = 0
     ) -> List[Dict]:
         """
-        Récupérer les événements depuis l'API.
+        Récupérer les événements depuis l'API OpenDataSoft.
+        Filtre DIRECTEMENT À L'API: ville + dates (futur, < 1 an)
         
         Args:
             city: Nom de la ville
-            limit: Nombre max d'événements à récupérer
+            limit: Nombre max d'événements à récupérer (max 100 par requête)
             offset: Offset pour la pagination
             
         Returns:
-            Liste des événements
+            Liste des événements (déjà filtrés par l'API)
         """
         try:
-            # Construire l'URL avec les paramètres
-            url = f"{self.base_url}/agendas"
+            # OpenDataSoft API - limit max is 100
+            limit = min(limit, 100)
             
+            # Construire la plage de dates pour le filtre API
+            start_date, end_date = get_date_range()
+            start_iso = start_date.isoformat().split('+')[0] + "Z"  # Format ISO compatible
+            end_iso = end_date.isoformat().split('+')[0] + "Z"
+            
+            # Construire les paramètres de requête avec filtres
             params = {
-                "apiKey": self.api_key,
-                "search": city,
                 "limit": limit,
                 "offset": offset,
-                "include": "events",
+                "refine": f"location_city:{city}",  # Filtre ville
+                "where": f"firstdate_begin>=\"{start_iso}\" AND firstdate_begin<=\"{end_iso}\""  # Filtre dates (futur, < 1 an)
             }
             
-            logger.info(f"Fetching events for {city} from Open Agenda API...")
-            response = self.session.get(url, params=params, timeout=30)
+            logger.info(f"Fetching events for {city} from OpenDataSoft API (future events only, < 1 year)...")
+            logger.info(f"Date range: {start_iso} to {end_iso}")
+            response = self.session.get(self.base_url, params=params, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             
-            # Extraire les événements de la réponse
-            events = []
-            if "data" in data:
-                for agenda in data["data"]:
-                    if "events" in agenda:
-                        events.extend(agenda["events"])
+            # Extraire les événements de la réponse (format OpenDataSoft)
+            events = data.get("results", [])
             
             logger.info(f"Successfully fetched {len(events)} events")
             return events
@@ -102,36 +97,62 @@ class OpenAgendaEventFetcher:
 
     def filter_events(self, events: List[Dict]) -> List[Dict]:
         """
-        Filtrer les événements selon des critères.
+        Valider la structure des événements (données complètes).
+        NOTE: Les dates sont déjà filtrées à l'API, on valide juste les champs obligatoires.
         
         Args:
-            events: Liste des événements
+            events: Liste des événements (pré-filtrés par l'API)
             
         Returns:
-            Liste des événements filtrés
+            Liste des événements valides
         """
         filtered = []
-        start_date, end_date = get_date_range()
+        rejected = []
         
         for event in events:
             try:
-                # Vérifier que l'événement a les champs requis
-                if not event.get("title"):
+                event_title = event.get("title_fr", "Unknown")
+                
+                # Vérifier que l'événement a les champs requis (titre français)
+                if not event.get("title_fr"):
+                    rejected.append((event_title, "Missing title_fr"))
                     continue
                     
-                # Filtrer par date si disponible
-                if "date" in event and event["date"]:
-                    event_date = datetime.fromisoformat(event["date"]["start"].replace("Z", "+00:00"))
-                    if not (start_date <= event_date <= end_date):
-                        continue
+                # Vérifier qu'il y a une description
+                description = event.get("description_fr") or event.get("longdescription_fr", "")
+                if not description:
+                    rejected.append((event_title, "Missing description"))
+                    continue
+                
+                # Note: Date est déjà validée par l'API (via where clause)
+                if not event.get("firstdate_begin"):
+                    rejected.append((event_title, "Missing event date (firstdate_begin)"))
+                    continue
+                
+                # Valider le format de la date
+                try:
+                    datetime.fromisoformat(event["firstdate_begin"].replace("Z", "+00:00"))
+                except (ValueError, TypeError) as e:
+                    rejected.append((event_title, f"Invalid date format: {event.get('firstdate_begin')}"))
+                    continue
                 
                 filtered.append(event)
                 
             except Exception as e:
-                logger.warning(f"Error filtering event: {e}")
+                logger.warning(f"Error validating event: {e}")
+                rejected.append((event.get("title_fr", "Unknown"), str(e)))
                 continue
         
-        logger.info(f"Filtered to {len(filtered)} events")
+        logger.info(f"Validated events: {len(filtered)} accepted, {len(rejected)} rejected")
+        
+        # Log rejections if any
+        if rejected:
+            logger.warning(f"Rejected {len(rejected)} events:")
+            for title, reason in rejected[:5]:  # Show first 5 rejections
+                logger.warning(f"  - {title}: {reason}")
+            if len(rejected) > 5:
+                logger.warning(f"  ... and {len(rejected) - 5} more")
+        
         return filtered
 
 

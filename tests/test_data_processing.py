@@ -9,7 +9,6 @@ from pathlib import Path
 from datetime import datetime
 
 from src.data_processing.clean_data import EventDataCleaner
-from src.data_processing.fetch_events import OpenAgendaEventFetcher
 
 
 class TestEventDataCleaner:
@@ -136,34 +135,6 @@ class TestEventDataCleaner:
         assert events == []
 
 
-class TestOpenAgendaEventFetcher:
-    """Tests pour la classe OpenAgendaEventFetcher."""
-
-    @pytest.fixture
-    def fetcher(self):
-        """Fixture pour créer un fetcher."""
-        return OpenAgendaEventFetcher()
-
-    def test_fetcher_initialization(self, fetcher):
-        """Tester l'initialisation du fetcher."""
-        assert fetcher.api_key == "123123"
-        assert fetcher.base_url == "https://api.openagenda.com/v2"
-        assert fetcher.session is not None
-
-    def test_filter_events_empty_list(self, fetcher):
-        """Tester le filtrage d'une liste vide."""
-        filtered = fetcher.filter_events([])
-        assert filtered == []
-
-    def test_filter_events_missing_title(self, fetcher):
-        """Tester que les événements sans titre sont filtrés."""
-        events = [
-            {"description": "Event description"},  # Pas de titre
-        ]
-        filtered = fetcher.filter_events(events)
-        assert len(filtered) == 0
-
-
 class TestDataIntegration:
     """Tests d'intégration pour le pipeline complet."""
 
@@ -197,3 +168,206 @@ class TestDataIntegration:
         assert cleaned["date_start"] is not None
         assert "Toulouse" in cleaned["location"]
         assert cleaned["source"] == "openagenda"
+
+class TestEventDataQuality:
+    """Tests pour valider la qualité des données d'événements récupérées."""
+
+    @pytest.fixture
+    def fetcher(self):
+        """Fixture pour créer un fetcher."""
+        from src.data_processing.fetch_events import OpenAgendaEventFetcher
+        return OpenAgendaEventFetcher()
+
+    def test_filter_events_rejects_missing_title(self, fetcher):
+        """Tester que les événements sans titre sont rejetés."""
+        event_no_title = {
+            "title_fr": None,
+            "description_fr": "Event without title",
+            "firstdate_begin": "2026-03-15T19:00:00Z",
+        }
+        
+        filtered = fetcher.filter_events([event_no_title])
+        assert len(filtered) == 0, "Event without title should be rejected"
+
+    def test_filter_events_rejects_missing_date(self, fetcher):
+        """Tester que les événements sans date sont rejetés."""
+        event_no_date = {
+            "title_fr": "Event without date",
+            "description_fr": "A concert",
+            "firstdate_begin": None,
+        }
+        
+        filtered = fetcher.filter_events([event_no_date])
+        assert len(filtered) == 0, "Event without date should be rejected"
+
+    def test_filter_events_rejects_missing_description(self, fetcher):
+        """Tester que les événements sans description sont rejetés."""
+        event_no_desc = {
+            "title_fr": "Event without description",
+            "description_fr": None,
+            "longdescription_fr": None,
+            "firstdate_begin": "2026-03-15T19:00:00Z",
+        }
+        
+        filtered = fetcher.filter_events([event_no_desc])
+        assert len(filtered) == 0, "Event without description should be rejected"
+
+    def test_filter_events_accepts_valid_event(self, fetcher):
+        """Tester qu'un événement valide est accepté."""
+        valid_event = {
+            "title_fr": "Exposition d'Art Moderne",
+            "description_fr": "Une magnifique exposition d'art contemporain",
+            "firstdate_begin": "2026-06-15T10:00:00Z",
+            "location_address": "Musée d'Art, Toulouse",
+        }
+        
+        filtered = fetcher.filter_events([valid_event])
+        assert len(filtered) == 1, "Valid event should be accepted"
+        assert filtered[0]["title_fr"] == "Exposition d'Art Moderne"
+
+    def test_filter_events_accepts_with_longdescription(self, fetcher):
+        """Tester qu'un événement avec longdescription_fr est accepté."""
+        valid_event = {
+            "title_fr": "Concert de Jazz",
+            "description_fr": None,
+            "longdescription_fr": "Un super concert de jazz avec des artistes internationaux",
+            "firstdate_begin": "2026-05-20T20:00:00Z",
+        }
+        
+        filtered = fetcher.filter_events([valid_event])
+        assert len(filtered) == 1, "Event with longdescription_fr should be accepted"
+
+    def test_filter_events_rejects_invalid_date_format(self, fetcher):
+        """Tester que les événements avec formats de date invalides sont rejetés."""
+        event_bad_date = {
+            "title_fr": "Event with bad date",
+            "description_fr": "Some description",
+            "firstdate_begin": "not-a-date-format",
+        }
+        
+        filtered = fetcher.filter_events([event_bad_date])
+        assert len(filtered) == 0, "Event with invalid date format should be rejected"
+
+    def test_filter_events_accepts_mixed_batch(self, fetcher):
+        """Tester le filtrage d'un lot mixte d'événements valides et invalides."""
+        events = [
+            # Valide
+            {
+                "title_fr": "Concert 1",
+                "description_fr": "Valid concert",
+                "firstdate_begin": "2026-03-15T19:00:00Z",
+            },
+            # Invalide - pas de titre
+            {
+                "title_fr": None,
+                "description_fr": "No title",
+                "firstdate_begin": "2026-03-20T19:00:00Z",
+            },
+            # Valide
+            {
+                "title_fr": "Exposition 2",
+                "description_fr": "Art exhibition",
+                "firstdate_begin": "2026-04-10T10:00:00Z",
+            },
+            # Invalide - pas de description
+            {
+                "title_fr": "No Description Event",
+                "description_fr": None,
+                "longdescription_fr": None,
+                "firstdate_begin": "2026-06-01T18:00:00Z",
+            },
+        ]
+        
+        filtered = fetcher.filter_events(events)
+        assert len(filtered) == 2, "Should accept 2 valid events and reject 2 invalid"
+        assert filtered[0]["title_fr"] == "Concert 1"
+        assert filtered[1]["title_fr"] == "Exposition 2"
+
+class TestFetchedEventsValidation:
+    """Tests pour valider les données réellement récupérées depuis l'API."""
+
+    def test_all_events_have_future_dates(self):
+        """Vérifier que TOUS les événements ont des dates futures (>= aujourd'hui)."""
+        from pathlib import Path
+        from datetime import datetime, timezone
+        
+        raw_file = Path(__file__).parent.parent / "data" / "raw" / "toulouse_events_raw.json"
+        
+        if not raw_file.exists():
+            pytest.skip("Raw events file not found - run fetch_events.py first")
+        
+        with open(raw_file, 'r', encoding='utf-8') as f:
+            events = json.load(f)
+        
+        assert len(events) > 0, "Should have fetched at least 1 event"
+        
+        now = datetime.now(timezone.utc)
+        
+        for event in events:
+            event_date_str = event.get("firstdate_begin")
+            assert event_date_str is not None, f"Event {event.get('title_fr')} missing date"
+            
+            event_date = datetime.fromisoformat(event_date_str.replace("Z", "+00:00"))
+            assert event_date >= now, f"Event {event.get('title_fr')} date {event_date_str} is in the past"
+
+    def test_all_events_within_1_year(self):
+        """Vérifier que TOUS les événements sont à moins d'1 an."""
+        from pathlib import Path
+        from datetime import datetime, timedelta, timezone
+        
+        raw_file = Path(__file__).parent.parent / "data" / "raw" / "toulouse_events_raw.json"
+        
+        if not raw_file.exists():
+            pytest.skip("Raw events file not found - run fetch_events.py first")
+        
+        with open(raw_file, 'r', encoding='utf-8') as f:
+            events = json.load(f)
+        
+        assert len(events) > 0, "Should have fetched at least 1 event"
+        
+        now = datetime.now(timezone.utc)
+        one_year_later = now + timedelta(days=365)
+        
+        for event in events:
+            event_date_str = event.get("firstdate_begin")
+            event_date = datetime.fromisoformat(event_date_str.replace("Z", "+00:00"))
+            assert event_date <= one_year_later, f"Event {event.get('title_fr')} date {event_date_str} is more than 1 year away"
+
+    def test_all_events_from_toulouse(self):
+        """Vérifier que les événements sont de Toulouse."""
+        from pathlib import Path
+        
+        raw_file = Path(__file__).parent.parent / "data" / "raw" / "toulouse_events_raw.json"
+        
+        if not raw_file.exists():
+            pytest.skip("Raw events file not found - run fetch_events.py first")
+        
+        with open(raw_file, 'r', encoding='utf-8') as f:
+            events = json.load(f)
+        
+        assert len(events) > 0, "Should have fetched at least 1 event"
+        
+        for event in events:
+            city = event.get("location_city", "").lower()
+            assert "toulouse" in city, f"Event {event.get('title_fr')} is not from Toulouse (city: {city})"
+
+    def test_events_have_required_fields(self):
+        """Vérifier que tous les événements ont les champs obligatoires."""
+        from pathlib import Path
+        
+        raw_file = Path(__file__).parent.parent / "data" / "raw" / "toulouse_events_raw.json"
+        
+        if not raw_file.exists():
+            pytest.skip("Raw events file not found - run fetch_events.py first")
+        
+        with open(raw_file, 'r', encoding='utf-8') as f:
+            events = json.load(f)
+        
+        assert len(events) > 0, "Should have fetched at least 1 event"
+        
+        required_fields = ["title_fr", "firstdate_begin"]
+        
+        for i, event in enumerate(events):
+            for field in required_fields:
+                assert field in event, f"Event {i} ({event.get('title_fr')}) missing required field: {field}"
+                assert event[field], f"Event {i} ({event.get('title_fr')}) has empty {field}"
