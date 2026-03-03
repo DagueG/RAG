@@ -63,9 +63,143 @@ RAG/
 
 ---
 
-## 🚀 Installation et démarrage
+## 🚀 Instructions complètes du projet
 
 ### Prérequis
+
+- **Python 3.11** 
+- **Docker** (pour conteneurisation)
+- **uv** package manager
+
+### 1️⃣ Installation locale
+
+```powershell
+# Activer l'environnement virtuel
+.\.venv\Scripts\Activate.ps1
+
+# Installer les dépendances
+pip install -e .
+```
+
+### 2️⃣ Exécution complète du pipeline (dans l'ordre)
+
+```powershell
+# Étape 2: Récupérer les événements (100 événements Toulouse, futur, < 1 an)
+python src/data_processing/fetch_events.py
+# Output: data/raw/toulouse_events_raw.json (100 événements)
+
+# Étape 3: Nettoyer et transformer les données
+python src/data_processing/clean_data.py
+# Output: data/processed/toulouse_events.json (100 événements nettoyés)
+
+# Étape 4: Construire l'index Faiss
+python src/vectorization/build_index.py
+# Output: data/faiss_index/ (index + métadonnées)
+
+# Étape 5: Lancer tous les tests
+pytest tests/ -v
+
+# Étape 5b: Lancer SEULEMENT les tests de validation des données
+pytest tests/test_data_processing.py::TestFetchedEventsValidation -v
+
+# Étape 5c: Lancer l'API REST (dans un nouveau terminal)
+python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+# API disponible: http://localhost:8000
+# Swagger UI: http://localhost:8000/docs
+```
+
+### 3️⃣ Déploiement Docker (Étape 6)
+
+**Build l'image Docker:**
+```powershell
+docker build -t rag-api:latest .
+```
+
+**Lance le conteneur:**
+```powershell
+docker run -p 8000:8000 -it rag-api:latest
+```
+
+**Accès au conteneur:**
+- API: http://localhost:8000
+- Docs: http://localhost:8000/docs
+
+**Arrêter le conteneur:**
+```powershell
+# Ctrl+C dans le terminal, ou dans un autre terminal:
+docker stop <container_id>
+```
+
+---
+
+## 🏗️ Architecture complète
+
+```
+src/
+├── data_processing/
+│   ├── fetch_events.py       # Récupère 100 événements Toulouse (OpenDataSoft API)
+│   └── clean_data.py         # Nettoie et transforme les données
+│
+├── vectorization/
+│   ├── build_index.py        # Construit l'index Faiss (99 vecteurs)
+│   └── embeddings.py         # Sentence-transformers (384-dim)
+│
+├── rag/
+│   └── rag_chain.py          # Orchestration Faiss + Mistral LLM
+│
+└── api/
+    └── main.py               # FastAPI avec 5 endpoints
+```
+
+---
+
+## 📊 Résumé des étapes du projet
+
+| Étape | Script | Input | Output | Status |
+|-------|--------|-------|--------|--------|
+| 2 | `fetch_events.py` | OpenDataSoft API | 100 événements bruts | ✅ |
+| 3 | `clean_data.py` | Bruts | 100 événements nettoyés | ✅ |
+| 4 | `build_index.py` | Nettoyés | Index Faiss 99 vecteurs | ✅ |
+| 5 | `pytest tests/` | All tests | 72 tests PASSED | ✅ |
+| 5 | `uvicorn src.api.main:app` | HttpRequests | Réponses RAG | ✅ |
+| 6 | `docker build` | Dockerfile | Image Docker | ✅ |
+| 6 | `docker run` | Image | Conteneur API | ✅ |
+
+---
+
+## 🧪 Tests
+
+**Tous les tests:**
+```powershell
+pytest tests/ -v
+# 72+ tests PASSED
+```
+
+**Validation des données:**
+```powershell
+pytest tests/test_data_processing.py::TestFetchedEventsValidation -v
+# Vérifie: Toulouse, futures dates, < 1 an
+```
+
+**Tests RAG Chain:**
+```powershell
+pytest tests/test_rag_chain.py -v
+```
+
+---
+
+## 📝 Fichiers importants
+
+- [`fetch_events.py`](src/data_processing/fetch_events.py#L45-L95) - Filtre à l'API (Toulouse + futur < 1 an)
+- [`clean_data.py`](src/data_processing/clean_data.py) - Support formats OpenDataSoft + OpenAgenda
+- [`rag_chain.py`](src/rag/rag_chain.py) - Mistral + Faiss orchestration
+- [`main.py`](src/api/main.py) - FastAPI endpoints
+- [`Dockerfile`](Dockerfile) - Multi-stage build
+- [`pyproject.toml`](pyproject.toml) - Dépendances uv
+
+---
+
+## Prérequis
 
 - **Python >= 3.8** installé sur votre machine
 - **uv** (gestionnaire de packages) - [Installation](https://github.com/astral-sh/uv)
