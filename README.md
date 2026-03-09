@@ -77,8 +77,8 @@ RAG/
 # Activer l'environnement virtuel
 .\.venv\Scripts\Activate.ps1
 
-# Installer les dépendances
-pip install -e .
+# Synchroniser les dépendances
+uv sync
 ```
 
 ### 2️⃣ Exécution complète du pipeline (dans l'ordre)
@@ -103,7 +103,7 @@ pytest tests/ -v
 pytest tests/test_data_processing.py::TestFetchedEventsValidation -v
 
 # Étape 5c: Lancer l'API REST (dans un nouveau terminal)
-python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 # API disponible: http://localhost:8000
 # Swagger UI: http://localhost:8000/docs
 ```
@@ -188,12 +188,101 @@ pytest tests/test_rag_chain.py -v
 
 ---
 
+## 🌐 API REST - Utilisation et Test
+
+### Lancer l'API
+
+```powershell
+# Terminal 1: Lancer le serveur API
+uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+# API disponible à: http://localhost:8000
+# Documentation interactive: http://localhost:8000/docs
+# OpenAPI JSON: http://localhost:8000/openapi.json
+```
+
+### Endpoints disponibles
+
+#### 1️⃣ **GET /health**
+Vérifie l'état de l'API et du système RAG.
+
+```bash
+curl http://localhost:8000/health
+```
+
+#### 2️⃣ **POST /ask**
+Poser une question et obtenir une réponse avec événements recommandés.
+
+```bash
+curl -X POST "http://localhost:8000/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Je cherche un concert de jazz à Toulouse", "k": 5}'
+```
+
+#### 3️⃣ **POST /rebuild**
+Reconstruire l'index Faiss (utile après mise à jour des données).
+
+#### 4️⃣ **GET /info**
+Observer les informations du système.
+
+### Test interactif de l'API
+
+```powershell
+# Terminal 2: Lancer le script de démonstration
+python tests/demo_api.py
+```
+
+Ce script teste automatiquement les endpoints et affiche les réponses.
+
+---
+
+## 🎯 Évaluation Automatique avec Ragas
+
+Evaluez la qualité des réponses générées par le système RAG.
+
+### Métriques d'évaluation
+
+| Métrique | Définition |
+|----------|----------|
+| **Faithfulness** | Fidélité aux données sources récupérées |
+| **Answer Relevance** | Pertinence de la réponse par rapport à la question |
+| **Context Precision** | Pertinence des événements sélectionnés |
+| **Context Recall** | Couverture des événements pertinents |
+
+### Lancer l'évaluation
+
+```powershell
+# Terminal 1: L'API doit être en cours d'exécution
+uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2: Lancer le script d'évaluation
+python tests/evaluate_rag.py
+```
+
+Le script génère :
+- Scores détaillés pour chaque question
+- Statistiques agrégées
+- Résultats sauvegardés dans `tests/evaluation_results.json`
+- Recommandations d'amélioration
+
+### Dataset d'évaluation
+
+Le dataset se trouve dans [`tests/evaluation_dataset.json`](tests/evaluation_dataset.json) avec :
+- 5 questions de test annotées
+- Réponses de référence
+- Mots-clés attendus
+
+---
+
 ## 📝 Fichiers importants
 
 - [`fetch_events.py`](src/data_processing/fetch_events.py#L45-L95) - Filtre à l'API (Toulouse + futur < 1 an)
 - [`clean_data.py`](src/data_processing/clean_data.py) - Support formats OpenDataSoft + OpenAgenda
 - [`rag_chain.py`](src/rag/rag_chain.py) - Mistral + Faiss orchestration
-- [`main.py`](src/api/main.py) - FastAPI endpoints
+- [`main.py`](src/api/main.py) - FastAPI endpoints avec gestion d'erreurs
+- [`demo_api.py`](tests/demo_api.py) - Test interactif de l'API
+- [`evaluate_rag.py`](tests/evaluate_rag.py) - Évaluation automatique avec Ragas
+- [`evaluation_dataset.json`](tests/evaluation_dataset.json) - Dataset d'évaluation annoté
 - [`Dockerfile`](Dockerfile) - Multi-stage build
 - [`pyproject.toml`](pyproject.toml) - Dépendances uv
 
@@ -234,9 +323,9 @@ uv venv
 source venv/bin/activate
 ```
 
-#### 4. Installer les dépendances
+#### 4. Synchroniser les dépendances
 ```bash
-uv pip install -r requirements.txt
+uv sync
 ```
 
 #### 5. Configurer les variables d'environnement
@@ -344,8 +433,8 @@ Avant de passer à l'étape suivante, assurez-vous que :
 ### ❌ "Module not found" lors des imports
 ```bash
 # Vérifiez que l'environnement virtuel est activé
-# Réinstallez les dépendances
-uv pip install -r requirements.txt --force-reinstall
+# Resynchronisez les dépendances
+uv sync --reinstall
 ```
 
 ### ❌ "Mistral API Key not found"
@@ -358,6 +447,12 @@ cat .env
 ```bash
 # Utilisez faiss-cpu au lieu de faiss-gpu
 uv pip install faiss-cpu --force-reinstall
+```
+
+### ❌ "Cannot connect to API" lors de demo_api.py ou evaluate_rag.py
+```bash
+# Assurez-vous que l'API tourne dans un autre terminal
+uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
 
 ---

@@ -1,0 +1,41 @@
+{
+  "evaluation_samples": [
+    {
+      "question": "Je cherche un concert de musique classique à Toulouse",
+      "ground_truth": "Cherchez des concerts d'orchestres symphoniques, de musique de chambre ou de concertos au Théâtre du Capitole ou à l'Auditorium de Toulouse.",
+      "expected_keywords": ["concert", "musique classique", "Toulouse", "orchestre"],
+      "id": "q1"
+    },
+    {
+      "question": "Quels sont les événements culturels ce mois-ci?",
+      "ground_truth": "Les événements culturels à Toulouse incluent des expositions, des concerts, du théâtre et des festivals disponibles dans les prochaines semaines.",
+      "expected_keywords": ["événement", "culturel", "Toulouse", "exposition", "concert", "théâtre"],
+      "id": "q2"
+    },
+    {
+      "question": "Y a-t-il des expos au musée à Toulouse?",
+      "ground_truth": "Les musées de Toulouse proposent régulièrement des expositions temporaires et permanentes sur l'art, l'histoire et la culture.",
+      "expected_keywords": ["exposition", "musée", "Toulouse", "art"],
+      "id": "q3"
+    },
+    {
+      "question": "Quels festivals se déroulent à Toulouse?",
+      "ground_truth": "Toulouse accueille plusieurs festivals importants incluant festivals de théâtre, musique, cinéma et autres événements culturels tout au long de l'année.",
+      "expected_keywords": ["festival", "Toulouse", "théâtre", "musique", "cinéma"],
+      "id": "q4"
+    },
+    {
+      "question": "Je veux assister à un spectacle de danse contemporaine",
+      "ground_truth": "Les salles de danse contemporaine à Toulouse incluent l'Opéra-Théâtre, les studios de danse indépendants et les salles de spectacle modernes.",
+      "expected_keywords": ["danse", "contemporain", "spectacle", "Toulouse"],
+      "id": "q5"
+    }
+  ],
+  "description": "Dataset d'évaluation pour évaluer la qualité des réponses du système RAG avec Ragas",
+  "metrics": {
+    "faithfulness": "Fidélité: la réponse reflète-t-elle les événements réels?",
+    "answer_relevance": "Pertinence: la réponse répond-elle à la question posée?",
+    "context_precision": "Précision du contexte: les événements utilisés sont-ils pertinents?",
+    "context_recall": "Rappel du contexte: tous les événements pertinents sont-ils couverts?"
+  }
+}
