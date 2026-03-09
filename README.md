@@ -479,7 +479,3 @@ uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 | Version | Date | Description |
 |---------|------|-------------|
 | 1.0 | 26/02/2026 | Configuration initiale de l'environnement |
-
----
-
-**Prêt à démarrer ? Consultez les étapes du projet dans `contexte.txt`**
