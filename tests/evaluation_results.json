@@ -1,0 +1,57 @@
+[
+  {
+    "id": "q1",
+    "question": "Je cherche un concert de jazz à Toulouse",
+    "metrics": {
+      "faithfulness": 0.3076923076923077,
+      "answer_relevance": 0.75,
+      "context_precision": 0.3684210526315789,
+      "answer_correctness": 0.6842105263157895
+    },
+    "score": 0.527580971659919
+  },
+  {
+    "id": "q2",
+    "question": "Qu'y a-t-il comme expositions à Toulouse?",
+    "metrics": {
+      "faithfulness": 0.2638888888888889,
+      "answer_relevance": 0.3333333333333333,
+      "context_precision": 0.3125,
+      "answer_correctness": 0.4375
+    },
+    "score": 0.3368055555555556
+  },
+  {
+    "id": "q3",
+    "question": "Je veux assister à un spectacle de théâtre à Toulouse",
+    "metrics": {
+      "faithfulness": 0.3584905660377358,
+      "answer_relevance": 0.6666666666666666,
+      "context_precision": 0.2777777777777778,
+      "answer_correctness": 0.3888888888888889
+    },
+    "score": 0.42295597484276726
+  },
+  {
+    "id": "q4",
+    "question": "Quels évènements intéressant pour les jeux vidéos ?",
+    "metrics": {
+      "faithfulness": 0.3382352941176471,
+      "answer_relevance": 0.25,
+      "context_precision": 0.3333333333333333,
+      "answer_correctness": 0.4666666666666667
+    },
+    "score": 0.34705882352941175
+  },
+  {
+    "id": "q5",
+    "question": "Y a-t-il des festivals à Toulouse en 2026?",
+    "metrics": {
+      "faithfulness": 0.3392857142857143,
+      "answer_relevance": 0.75,
+      "context_precision": 0.5789473684210527,
+      "answer_correctness": 0.42105263157894735
+    },
+    "score": 0.5223214285714286
+  }
+]

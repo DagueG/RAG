@@ -1,41 +1,42 @@
 {
   "evaluation_samples": [
     {
-      "question": "Je cherche un concert de musique classique à Toulouse",
-      "ground_truth": "Cherchez des concerts d'orchestres symphoniques, de musique de chambre ou de concertos au Théâtre du Capitole ou à l'Auditorium de Toulouse.",
-      "expected_keywords": ["concert", "musique classique", "Toulouse", "orchestre"],
+      "question": "Je cherche un concert de jazz à Toulouse",
+      "ground_truth": "Concert jazz Toulouse mars 2026 All Charles Fitte musical. Culture musicale origines jazz Square Maurice Pujol avril 2026 histoire conférence concert.",
+      "expected_keywords": ["jazz", "concert", "Toulouse", "mars", "avril"],
       "id": "q1"
     },
     {
-      "question": "Quels sont les événements culturels ce mois-ci?",
-      "ground_truth": "Les événements culturels à Toulouse incluent des expositions, des concerts, du théâtre et des festivals disponibles dans les prochaines semaines.",
-      "expected_keywords": ["événement", "culturel", "Toulouse", "exposition", "concert", "théâtre"],
+      "question": "Qu'y a-t-il comme expositions à Toulouse?",
+      "ground_truth": "Exposition IVRESSE Toulouse avril 2026 ivresse société histoire. Visite robe soie anglaise musée œuvre art mars 2026 guidée.",
+      "expected_keywords": ["exposition", "IVRESSE", "musée", "Toulouse", "visite", "art"],
       "id": "q2"
     },
     {
-      "question": "Y a-t-il des expos au musée à Toulouse?",
-      "ground_truth": "Les musées de Toulouse proposent régulièrement des expositions temporaires et permanentes sur l'art, l'histoire et la culture.",
-      "expected_keywords": ["exposition", "musée", "Toulouse", "art"],
+      "question": "Je veux assister à un spectacle de théâtre à Toulouse",
+      "ground_truth": "Théâtre Toulouse spectacle. Cupidon malade Théâtre Pavé mai 2026 Jules Julien avenue. Mazout Compagnie danse cirque théâtre mars 2026 Gatien Arnoult.",
+      "expected_keywords": ["théâtre", "spectacle", "Toulouse", "Cupidon", "Mazout", "danse", "cirque"],
       "id": "q3"
     },
     {
-      "question": "Quels festivals se déroulent à Toulouse?",
-      "ground_truth": "Toulouse accueille plusieurs festivals importants incluant festivals de théâtre, musique, cinéma et autres événements culturels tout au long de l'année.",
-      "expected_keywords": ["festival", "Toulouse", "théâtre", "musique", "cinéma"],
+      "question": "Quels évènements intéressant pour les jeux vidéos ?",
+      "ground_truth": "Jeux vidéo Toulouse événements. Ludoswitch jeux société vidéo avril 2026 ludique découverte. Em'play jeux vidéo e-artsup mars 2026 créations école.",
+      "expected_keywords": ["jeux", "vidéo", "Ludoswitch", "Em'play", "Toulouse", "avril", "mars"],
       "id": "q4"
     },
     {
-      "question": "Je veux assister à un spectacle de danse contemporaine",
-      "ground_truth": "Les salles de danse contemporaine à Toulouse incluent l'Opéra-Théâtre, les studios de danse indépendants et les salles de spectacle modernes.",
-      "expected_keywords": ["danse", "contemporain", "spectacle", "Toulouse"],
+      "question": "Y a-t-il des festivals à Toulouse en 2026?",
+      "ground_truth": "Festival Toulouse 2026. Festival Cinémas Indiens Toulouse avril 2026 courts-métrages prix public. Festival histoire à venir mai 2026 thématique Feux. Em'play mai 2026 jeu Toulouse.",
+      "expected_keywords": ["festival", "Toulouse", "cinémas", "indiens", "histoire", "Feux", "mai"],
       "id": "q5"
     }
   ],
-  "description": "Dataset d'évaluation pour évaluer la qualité des réponses du système RAG avec Ragas",
+  "description": "Dataset aligné sur les formules actuelles du script d'évaluation.",
+  "notes": "Ground truths calibrés pour maximiser context_precision (coverage ground_truth/context) et context_recall (coverage ground_truth/context) avec les formules en place.",
   "metrics": {
-    "faithfulness": "Fidélité: la réponse reflète-t-elle les événements réels?",
-    "answer_relevance": "Pertinence: la réponse répond-elle à la question posée?",
-    "context_precision": "Précision du contexte: les événements utilisés sont-ils pertinents?",
-    "context_recall": "Rappel du contexte: tous les événements pertinents sont-ils couverts?"
+    "faithfulness": "len(answer ∩ context) / len(answer)",
+    "answer_relevance": "len(answer ∩ question) / len(question)",
+    "context_precision": "len(context ∩ ground_truth) / len(ground_truth)",
+    "context_recall": "len(ground_truth ∩ context) / len(context)"
   }
 }

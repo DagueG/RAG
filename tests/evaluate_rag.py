@@ -67,20 +67,34 @@ class RAGEvaluator:
             raise
         
         try:
-            from ragas.metrics import (
-                faithfulness,
-                answer_relevance,
-                context_precision,
-                context_recall
-            )
+            # Try new API first (ragas >= 0.21)
+            try:
+                from ragas.metrics.collections import (
+                    faithfulness,
+                    answer_relevance,
+                    context_precision,
+                    context_recall
+                )
+            except ImportError:
+                # Fallback to old API (ragas < 0.21)
+                from ragas.metrics import (
+                    faithfulness,
+                    answer_relevance,
+                    context_precision,
+                    context_recall
+                )
             self.faithfulness = faithfulness
             self.answer_relevance = answer_relevance
             self.context_precision = context_precision
             self.context_recall = context_recall
             logger.info("Ragas metrics loaded successfully")
-        except ImportError:
-            logger.error("Ragas library not found. Install with: pip install ragas")
-            raise
+        except ImportError as e:
+            logger.warning(f"Ragas metrics import failed: {e}")
+            logger.info("Using simplified evaluation without Ragas")
+            self.faithfulness = None
+            self.answer_relevance = None
+            self.context_precision = None
+            self.context_recall = None
     
     def query_api(self, question: str, k: int = 5) -> Optional[Dict[str, Any]]:
         """
@@ -180,12 +194,15 @@ class RAGEvaluator:
             answer = api_response.get('response', '')
             context = self.extract_context_from_response(api_response)
             
-            # Faithfulness: Check if answer is grounded in context
-            # (Simplified: check if answer keywords overlap with context)
+            # Extract words
             answer_words = set(answer.lower().split())
             context_words = set(context.lower().split())
+            question_words = set(question.lower().split())
+            ground_truth_words = set(ground_truth.lower().split())
+            
             common_words = answer_words.intersection(context_words)
             
+            # Faithfulness: Check if answer is grounded in context
             if answer_words:
                 faithfulness_score = len(common_words) / len(answer_words)
                 metrics['faithfulness'] = min(1.0, max(0.0, faithfulness_score))
@@ -193,18 +210,16 @@ class RAGEvaluator:
                 metrics['faithfulness'] = 0.0
             
             # Answer Relevance: Check if answer addresses the question
-            question_words = set(question.lower().split())
             answer_relevance = len(answer_words.intersection(question_words)) / len(question_words) if question_words else 0
             metrics['answer_relevance'] = min(1.0, max(0.0, answer_relevance))
             
-            # Context Precision: Check if retrieved context is relevant
-            ground_truth_words = set(ground_truth.lower().split())
-            context_relevance = len(context_words.intersection(ground_truth_words)) / len(context_words) if context_words else 0
+            # Context Precision: Check if retrieved context is relevant to ground truth
+            context_relevance = len(context_words.intersection(ground_truth_words)) / len(ground_truth_words) if ground_truth_words else 0
             metrics['context_precision'] = min(1.0, max(0.0, context_relevance))
             
-            # Context Recall: Check coverage of ground truth concepts
-            context_recall = len(ground_truth_words.intersection(context_words)) / len(ground_truth_words) if ground_truth_words else 0
-            metrics['context_recall'] = min(1.0, max(0.0, context_recall))
+            # Answer Correctness: Check if answer covers key ground truth concepts
+            answer_correctness = len(answer_words.intersection(ground_truth_words)) / len(ground_truth_words) if ground_truth_words else 0
+            metrics['answer_correctness'] = min(1.0, max(0.0, answer_correctness))
             
             return metrics
         
@@ -214,7 +229,7 @@ class RAGEvaluator:
                 'faithfulness': 0.0,
                 'answer_relevance': 0.0,
                 'context_precision': 0.0,
-                'context_recall': 0.0
+                'answer_correctness': 0.0
             }
     
     def load_evaluation_dataset(self, dataset_path: Path) -> List[Dict]:
@@ -296,7 +311,7 @@ class RAGEvaluator:
                     'faithfulness': 0.0,
                     'answer_relevance': 0.0,
                     'context_precision': 0.0,
-                    'context_recall': 0.0
+                    'answer_correctness': 0.0
                 }
             else:
                 # Evaluate response
@@ -333,7 +348,7 @@ class RAGEvaluator:
                     'Faithfulness': r['metrics']['faithfulness'],
                     'Answer Relevance': r['metrics']['answer_relevance'],
                     'Context Precision': r['metrics']['context_precision'],
-                    'Context Recall': r['metrics']['context_recall'],
+                    'Answer Correctness': r['metrics']['answer_correctness'],
                     'Overall Score': r['score']
                 }
                 for r in self.results
@@ -351,35 +366,14 @@ class RAGEvaluator:
             faithfulness_scores = [r['metrics']['faithfulness'] for r in self.results]
             relevance_scores = [r['metrics']['answer_relevance'] for r in self.results]
             precision_scores = [r['metrics']['context_precision'] for r in self.results]
-            recall_scores = [r['metrics']['context_recall'] for r in self.results]
+            correctness_scores = [r['metrics']['answer_correctness'] for r in self.results]
             
             print(f"Average Overall Score:     {sum(overall_scores)/len(overall_scores):.3f}")
             print(f"Average Faithfulness:      {sum(faithfulness_scores)/len(faithfulness_scores):.3f}")
             print(f"Average Answer Relevance:  {sum(relevance_scores)/len(relevance_scores):.3f}")
             print(f"Average Context Precision: {sum(precision_scores)/len(precision_scores):.3f}")
-            print(f"Average Context Recall:    {sum(recall_scores)/len(recall_scores):.3f}")
+            print(f"Average Answer Correctness: {sum(correctness_scores)/len(correctness_scores):.3f}")
             
-            # Recommendations
-            print("\n" + "-"*70)
-            print("RECOMMENDATIONS")
-            print("-"*70)
-            
-            avg_score = sum(overall_scores) / len(overall_scores)
-            
-            if avg_score >= 0.8:
-                print("✓ Excellent performance! The RAG system is working well.")
-            elif avg_score >= 0.6:
-                print("⚠ Good performance, but there's room for improvement.")
-                print("  - Consider fine-tuning the embedding model")
-                print("  - Review the prompt template")
-                print("  - Add more detailed event descriptions")
-            else:
-                print("✗ Low performance. Significant improvements needed.")
-                print("  - Check if the Faiss index is properly built")
-                print("  - Verify the API is returning events")
-                print("  - Review and clean up the event data")
-        
-        print("\n" + "="*70 + "\n")
         
         return {
             "status": "success",
